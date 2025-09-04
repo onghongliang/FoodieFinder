@@ -11,9 +11,3 @@ The FoodieFinder project aims to address the challenge of finding halal and vega
 ## Lessons Learnt
 Gained a better understanding of how data structures work in real-world applications, especially in the context of search and navigation algorithms. Improved skills in integrating algorithms with web technologies and handling data cleaning challenges.
 
-## User Manual
-1. **Search for Food Stalls:** Use the search bar to find halal or vegan food stalls by name, location, or cuisine type.
-2. **View Recommendations:** Get personalized recommendations based on your search criteria and preferences.
-3. **Map Navigation:** Visualize stall locations on an interactive map and use the route finder to get directions within hawker centers.
-4. **Filter and Sort:** Apply filters (e.g., ratings, distance) and sort results using the available options.
-5. **Review Aggregation:** View aggregated reviews and ratings for each stall to make informed choices.

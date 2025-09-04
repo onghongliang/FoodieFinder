@@ -1,0 +1,592 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - FoodieFinder{% endblock %}
+
+{% block content %}
+<div class="hero bg-dark text-white d-flex flex-column justify-content-center align-items-center"
+    style="background-image: url('https://source.unsplash.com/1600x900/?vegan,food'); background-size: cover; background-position: center; height: 30vh;">
+    <h1 class="display-4 text-shadow">Find Restaurants Nearby</h1>
+    <div class="input-group mb-3" style="max-width: 1000px; margin: 0 auto; position: relative;">
+        <input id="place-input" type="text" class="form-control" placeholder="Enter MRT name or Restaurant name..."
+            onkeyup="handleSearch()">
+        <div class="input-group-append">
+            <button class="btn btn-outline-secondary" onclick="findPlace()">Find Place</button>
+            <button class="btn btn-outline-primary" onclick="getLocation()">Get Current Location</button>
+            <button class="btn btn-outline-info" onclick="refreshMap()">Refresh Map</button>
+        </div>
+
+        <!--dropdown for search-->
+        <div id="dropdownResults" class="dropdown-menu"
+            style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000;">
+        </div>
+    </div>
+</div>
+
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <span class="mr-2">Choose Food Option:</span>
+            <form class="form-inline" method="post" action="/filter" onsubmit="return validateForm()">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="dataset" id="dataset-halal" value="halal">
+                    <label class="form-check-label" for="dataset-halal">Halal</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="dataset" id="dataset-vegan" value="vegan">
+                    <label class="form-check-label" for="dataset-vegan">Vegan</label>
+                </div>
+                <span class="mr-2 ml-4">Filter by rating:</span>
+                <div class="input-group" style="max-width: 200px;">
+                    <input id="rating-input" type="number" class="form-control" name="rating" placeholder="0 - 5" min="0" max="5" step="0.1">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-success" type="submit">Filter</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-5">
+    <h2 class="text-center mb-4">Our Locations</h2>
+    <div id="map" class="mb-5" style="height: 500px;">
+        <!-- The map will be displayed here -->
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include Leaflet.js for map functionality -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+
+<script>
+    let map;
+    let currentLocationMarker;
+    let halalMarkers = [];
+    let mrtMarkers = [];
+    let veganMarkers = [];
+    let allData = [];
+    let userHasClickedGetLocation = false;  // Flag to track if user clicked "Get Current Location"
+
+
+    function initMap() {
+        map = L.map('map').setView([1.3521, 103.8198], 12); // Default view is set to Singapore
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        addExistingMarkers();
+    }
+
+    function addExistingMarkers() {
+        const halalUrl = '/static/halal.json';
+        const mrtUrl = '/static/mrt.json';
+        const veganUrl = '/static/vegan.json';
+
+        fetch(halalUrl)
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(markerInfo => {
+                    const marker = L.circleMarker([markerInfo.Latitude, markerInfo.Longitude], {
+                        color: 'green',
+                        radius: 8
+                    }).addTo(map);
+                    const popupContent = `<strong>${markerInfo.Title}</strong><br>${markerInfo.Address}<br>${markerInfo["Type of Food"]}<br>${markerInfo["Rating"]}<br><button onclick="getDirections(${markerInfo.Latitude}, ${markerInfo.Longitude})">Get Directions</button>`;
+                    marker.bindPopup(popupContent);
+                    marker.bindTooltip(markerInfo.Title, { permanent: false, direction: 'top' });
+                    halalMarkers.push({
+                        marker: marker,
+                        lat: markerInfo.Latitude,
+                        lon: markerInfo.Longitude
+                    });
+                    allData.push({
+                        Title: markerInfo.Title,
+                        Address: markerInfo.Address,
+                        Type_of_Food: markerInfo["Type of Food"],
+                        Rating: markerInfo["Rating"],
+                        Latitude: markerInfo.Latitude,
+                        Longitude: markerInfo.Longitude,
+                        PopupContent: popupContent
+                    });
+                });
+            });
+
+        fetch(mrtUrl)
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(markerInfo => {
+                    const marker = L.marker([markerInfo.Latitude, markerInfo.Longitude], {
+                        icon: L.icon({
+                            iconUrl: 'https://img.icons8.com/ios-filled/50/8b0000/train.png',
+                            iconSize: [25, 25],
+                            iconAnchor: [12, 12],
+                            popupAnchor: [0, -12]
+                        })
+                    }).addTo(map);
+                    const popupContent = `<strong>${markerInfo.STN_NAME}</strong><br>${markerInfo.STN_NO}<br><button onclick="getDirections(${markerInfo.Latitude}, ${markerInfo.Longitude})">Get Directions</button>`;
+                    marker.bindPopup(popupContent);
+                    marker.bindTooltip(markerInfo.STN_NAME, { permanent: false, direction: 'top' });
+                    mrtMarkers.push({
+                        marker: marker,
+                        lat: markerInfo.Latitude,
+                        lon: markerInfo.Longitude
+                    });
+                    allData.push({
+                        Title: markerInfo.STN_NAME,
+                        STN_NO: markerInfo.STN_NO,
+                        Latitude: markerInfo.Latitude,
+                        Longitude: markerInfo.Longitude,
+                        PopupContent: popupContent
+                    });
+                });
+            });
+
+        fetch(veganUrl)
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(markerInfo => {
+                    const marker = L.circleMarker([markerInfo.Latitude, markerInfo.Longitude], {
+                        color: 'purple',
+                        radius: 8
+                    }).addTo(map);
+                    const popupContent = `<strong>${markerInfo.Title}</strong><br>${markerInfo.Address}<br>${markerInfo["Type of Food"]}<br>${markerInfo["Rating"]}<br><button onclick="getDirections(${markerInfo.Latitude}, ${markerInfo.Longitude})">Get Directions</button>`;
+                    marker.bindPopup(popupContent);
+                    marker.bindTooltip(markerInfo.Title, { permanent: false, direction: 'top' });
+                    veganMarkers.push({
+                        marker: marker,
+                        lat: markerInfo.Latitude,
+                        lon: markerInfo.Longitude
+                    });
+                    allData.push({
+                        Title: markerInfo.Title,
+                        Address: markerInfo.Address,
+                        Type_of_Food: markerInfo["Type of Food"],
+                        Rating: markerInfo["Rating"],
+                        Latitude: markerInfo.Latitude,
+                        Longitude: markerInfo.Longitude,
+                        PopupContent: popupContent
+                    });
+                });
+            });
+    }
+
+
+    function findPlace() {
+        const placeInput = document.getElementById('place-input').value.toLowerCase();
+
+        // Fetch MRT data
+        fetch('/static/mrt.json')
+            .then(response => response.json())
+            .then(mrtData => {
+                const mrt = mrtData.find(mrt => mrt.STN_NAME.toLowerCase().replace(' mrt station', '') === placeInput);
+
+                if (mrt) {
+                    const lat = mrt.Latitude;
+                    const lon = mrt.Longitude;
+
+                    if (currentLocationMarker) {
+                        map.removeLayer(currentLocationMarker);
+                    }
+
+                    map.eachLayer(layer => {
+                        if (layer instanceof L.Marker || layer instanceof L.CircleMarker || layer instanceof L.Polyline) {
+                            map.removeLayer(layer);
+                        }
+                    })
+                    currentLocationMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<strong>${mrt.STN_NAME}</strong><br>${mrt.STN_NO}`).openPopup();
+                    map.setView([lat, lon], 15);
+
+                    // Find nearest markers from the MRT station location
+                    findNearestMarkers(lat, lon);
+                } else {
+                    // If MRT station not found, search in halal and vegan restaurants
+                    fetch('/static/halal.json')
+                        .then(response => response.json())
+                        .then(halalData => {
+                            const halal = halalData.find(halal => halal.Title.toLowerCase() === placeInput);
+
+                            if (halal) {
+                                const lat = halal.Latitude;
+                                const lon = halal.Longitude;
+
+                                if (currentLocationMarker) {
+                                    map.removeLayer(currentLocationMarker);
+                                }
+
+                                map.eachLayer(layer => {
+                                    if (layer instanceof L.Marker || layer instanceof L.CircleMarker || layer instanceof L.Polyline) {
+                                        map.removeLayer(layer);
+                                    }
+                                })
+                                currentLocationMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<strong>${halal.Title}</strong><br>${halal.Address}<br>${halal["Type of Food"]}<br>${halal["Rating"]}`).openPopup();
+                                map.setView([lat, lon], 15);
+
+                                return;
+                            }
+
+                            fetch('/static/vegan.json')
+                                .then(response => response.json())
+                                .then(veganData => {
+                                    const vegan = veganData.find(vegan => vegan.Title.toLowerCase() === placeInput);
+
+                                    if (vegan) {
+                                        const lat = vegan.Latitude;
+                                        const lon = vegan.Longitude;
+
+                                        if (currentLocationMarker) {
+                                            map.removeLayer(currentLocationMarker);
+                                        }
+
+                                        map.eachLayer(layer => {
+                                            if (layer instanceof L.Marker || layer instanceof L.CircleMarker || layer instanceof L.Polyline) {
+                                                map.removeLayer(layer);
+                                            }
+                                        })
+                                        currentLocationMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<strong>${vegan.Title}</strong><br>${vegan.Address}<br>${vegan["Type of Food"]}<br>${vegan["Rating"]}`).openPopup();
+                                        map.setView([lat, lon], 15);
+
+                                        return;
+                                    } else {
+                                        alert('Place not found.');
+                                    }
+                                })
+                                .catch(error => console.error('Error fetching vegan data:', error));
+                        })
+                        .catch(error => console.error('Error fetching halal data:', error));
+                }
+            })
+            .catch(error => console.error('Error fetching MRT data:', error));
+    }
+
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(showPosition);
+            userHasClickedGetLocation = true;  // Set the flag when user clicks "Get Current Location"
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    }
+
+    function showPosition(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        console.log(`Latitude: ${lat}, Longitude: ${lon}`); // Print coordinates to console
+
+        if (currentLocationMarker) {
+            map.removeLayer(currentLocationMarker);
+        }
+
+        currentLocationMarker = L.marker([lat, lon]).addTo(map).bindPopup("You are here").openPopup();
+
+        findNearestMarkers(lat, lon);
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radius of the Earth in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in km
+    }
+
+    function findNearestMarkers(lat, lon) {
+        const userLocation = { lat: lat, lon: lon };
+        const allMarkers = [...halalMarkers, ...mrtMarkers, ...veganMarkers];
+        const nodes = [userLocation, ...allMarkers.map(markerObj => ({ lat: markerObj.lat, lon: markerObj.lon }))];
+
+        const edges = nodes.map((node, index) => {
+            return nodes.map((neighbor, neighborIndex) => {
+                return {
+                    node: neighborIndex,
+                    distance: calculateDistance(node.lat, node.lon, neighbor.lat, neighbor.lon)
+                };
+            }).filter(edge => edge.node !== index);
+        });
+
+        fetch('/calculate_distances', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                source: 0, // User location is the source
+                nodes: nodes.map((node, index) => ({ id: index, lat: node.lat, lon: node.lon })),
+                edges: edges
+            })
+        })
+            .then(response => response.json())
+            .then(distances => {
+                let nearestHalalMarkers = [];
+                let nearestMrtMarker = null;
+                let nearestVeganMarkers = [];
+                let halalDistances = [];
+                let minDistanceMrt = Infinity;
+                let veganDistances = [];
+
+                halalMarkers.forEach((markerObj, index) => {
+                    const distance = distances[index + 1];
+                    halalDistances.push({ distance: distance, marker: markerObj.marker, lat: markerObj.lat, lon: markerObj.lon, title: markerObj.marker.getPopup().getContent() });
+                });
+
+                halalDistances.sort((a, b) => a.distance - b.distance);
+                nearestHalalMarkers = halalDistances.slice(0, 7);
+
+                mrtMarkers.forEach((markerObj, index) => {
+                    const distance = distances[halalMarkers.length + index + 1];
+                    if (distance < minDistanceMrt) {
+                        minDistanceMrt = distance;
+                        nearestMrtMarker = markerObj.marker;
+                    }
+                });
+
+                veganMarkers.forEach((markerObj, index) => {
+                    const distance = distances[halalMarkers.length + mrtMarkers.length + index + 1];
+                    veganDistances.push({ distance: distance, marker: markerObj.marker, lat: markerObj.lat, lon: markerObj.lon, title: markerObj.marker.getPopup().getContent() });
+                });
+
+                veganDistances.sort((a, b) => a.distance - b.distance);
+                nearestVeganMarkers = veganDistances.slice(0, 5);
+
+                // Clear all markers from the map
+                halalMarkers.forEach(markerObj => map.removeLayer(markerObj.marker));
+                mrtMarkers.forEach(markerObj => map.removeLayer(markerObj.marker));
+                veganMarkers.forEach(markerObj => map.removeLayer(markerObj.marker));
+
+                // Add only the nearest markers and traces
+                nearestHalalMarkers.forEach(halal => {
+                    map.addLayer(halal.marker);
+                });
+
+                if (nearestMrtMarker) {
+                    map.addLayer(nearestMrtMarker);
+                }
+
+                nearestVeganMarkers.forEach(vegan => {
+                    map.addLayer(vegan.marker);
+                });
+
+                // Zoom to fit all nearest markers
+                const bounds = L.latLngBounds(nearestHalalMarkers.map(marker => [marker.lat, marker.lon])
+                    .concat(nearestVeganMarkers.map(marker => [marker.lat, marker.lon])));
+                if (nearestMrtMarker) {
+                    bounds.extend(nearestMrtMarker.getLatLng());
+                }
+                bounds.extend([lat, lon]);
+                map.fitBounds(bounds);
+            })
+            .catch(error => console.error('Error calculating distances:', error));
+    }
+
+    function getDirections(endLat, endLon) {
+    if (userHasClickedGetLocation) {
+        // Fetch current location coordinates
+        getCurrentLocation()
+            .then((currentLocation) => {
+                const startCoords = currentLocation; // User's current location
+                const endCoords = [endLat, endLon]; // Destination coordinates (clicked marker)
+
+                // Calculate the distance between current location and destination
+                const distance = calculateDistance(startCoords[0], startCoords[1], endLat, endLon);
+
+                if (distance > 3) {
+                    alert('The place you are trying to get directions to is too far to walk.');
+                    return; // Do not proceed with fetching directions
+                }
+
+                const directionButton = document.querySelector('.leaflet-popup-content button');
+                if (directionButton) {
+                    directionButton.disabled = true;
+                    directionButton.style.backgroundColor = 'gray';
+                    directionButton.innerHTML = 'Loading...';
+                }
+
+                    // Make API call to get route
+                    fetch('/api/get_route', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ start: startCoords, end: endCoords })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                console.error(data.error);
+                                alert('Error calculating route: ' + data.error);
+                            } else {
+                                const pathCoords = data.path;
+
+                                // Clear any existing path from the map
+                                if (window.currentPath) {
+                                    map.removeLayer(window.currentPath);
+                                }
+
+                                // Ensure the path includes start and end coordinates
+                                pathCoords.unshift([startCoords[0], startCoords[1]]);
+                                pathCoords.push([endLat, endLon]);
+
+                                // Draw the new path on the map
+                                window.currentPath = L.polyline(pathCoords, { color: 'black' }).addTo(map);
+
+                                // Optionally, zoom the map to fit the path
+                                map.fitBounds(window.currentPath.getBounds());
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching directions:', error);
+                            alert('An error occurred while fetching the route. Please try again.');
+                        })
+                        .finally(() => {
+                            // Re-enable the button after processing is complete
+                            if (directionButton) {
+                                directionButton.disabled = false;
+                                directionButton.style.backgroundColor = '';
+                                directionButton.innerHTML = 'Get Directions';
+                            }
+                        });
+                })
+                .catch(error => {
+                    console.error('Error getting current location:', error);
+                    alert('Error getting current location.');
+                });
+        } else {
+            alert('The place you are trying to get direction is too far. Please click "Get Current Location" to proceed.');
+        }
+    }
+
+    function getCurrentLocation() {
+        return new Promise((resolve, reject) => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Extract latitude and longitude from the GeolocationPosition object
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        resolve([lat, lon]);
+                    },
+                    (error) => {
+                        reject(error);
+                    }
+                );
+            } else {
+                reject(new Error("Geolocation is not supported by this browser."));
+            }
+        });
+    }
+
+    function refreshMap() {
+        if (map) {
+            // Clear all layers from the map
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker || layer instanceof L.CircleMarker || layer instanceof L.Polyline) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Clear marker arrays
+            halalMarkers = [];
+            mrtMarkers = [];
+            veganMarkers = [];
+
+            // Re-add the base tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Re-add existing markers
+            addExistingMarkers();
+            userHasClickedGetLocation = false;  // Reset the flag when user clicks "Refresh Map"
+        }
+    }
+
+    // Function for searching restaurant name
+    function handleSearch() {
+        const query = document.getElementById('place-input').value;
+        if (query.length > 0) {
+            searchRestaurants(query);
+        } else {
+            document.getElementById('dropdownResults').style.display = 'none';
+        }
+    }
+
+    function searchRestaurants(query) {
+        fetch(`/search?q=${query}`)
+            .then(response => response.json())
+            .then(data => {
+                const dropdownResults = document.getElementById('dropdownResults');
+                dropdownResults.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'dropdown-item';
+                        div.textContent = item;
+                        div.onclick = function () {
+                            document.getElementById('place-input').value = item;
+                            dropdownResults.style.display = 'none';
+                            updateMapWithSearchResult(item); // Call function to update map
+                        };
+                        dropdownResults.appendChild(div);
+                    });
+                    dropdownResults.style.display = 'block';
+                } else {
+                    dropdownResults.style.display = 'none';
+                }
+            });
+    }
+
+    function updateMapWithSearchResult(selectedTitle) {
+        const selectedPlace = allData.find(place => place.Title === selectedTitle);
+        if (selectedPlace) {
+            const lat = selectedPlace.Latitude;
+            const lon = selectedPlace.Longitude;
+            const popupContent = selectedPlace.PopupContent;
+
+            if (currentLocationMarker) {
+                map.removeLayer(currentLocationMarker);
+            }
+
+            currentLocationMarker = L.marker([lat, lon]).addTo(map).bindPopup(popupContent).openPopup();
+            map.setView([lat, lon], 15);
+
+            // Find nearest markers from the selected location
+            findNearestMarkers(lat, lon);
+        }
+    }
+
+    function validateForm() {
+    // Check if any radio button is selected
+    var radios = document.getElementsByName('dataset');
+    var isRadioSelected = false;
+
+    for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+            isRadioSelected = true;
+            break;
+        }
+    }
+
+    if (!isRadioSelected) {
+        alert("Please select Halal or Vegan.");
+        return false; // Prevent form submission
+    }
+
+    // Check if rating input is provided
+    var rating = document.getElementById('rating-input').value;
+    if (rating === "") {
+        alert("Please enter a rating.");
+        return false; // Prevent form submission
+    }
+
+    return true; // Allow form submission
+}
+
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+{% endblock %}

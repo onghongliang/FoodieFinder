@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodieFinder</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        /* Styles for the popup form */
+        .login-popup {
+            display: none;
+            position: fixed;
+            z-index: 9;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding-top: 60px;
+        }
+        .login-popup-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Styles for the navbar and dropdown */
+        header {
+            background-color: transparent;
+        }
+        .navbar-nav .nav-item {
+            margin-right: 15px;
+        }
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            background-color: #fff;
+            min-width: 160px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+        }
+        .dropdown-menu a {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+        }
+        .dropdown-menu a:hover {
+            background-color: #f1f1f1;
+        }
+        .dropdown:hover .dropdown-menu {
+            display: block;
+        }
+
+        /* Additional styles for better UI/UX */
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .logo a {
+            font-size: 1.5rem;
+            color: #343a40;
+        }
+        .nav-link {
+            font-size: 1rem;
+        }
+        .btn {
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+        .shadow-sm {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+<header class="shadow-sm py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+        <div class="logo">
+            <a href="/home" class="text-dark font-weight-bold">FoodieFinder</a>
+        </div>
+        <nav class="d-flex align-items-center">
+            <a href="{{ url_for('main.view_reviews', dataset_type='halal') }}" class="nav-link text-dark"><i class="fas fa-users"></i> Halal Reviews</a>
+            <a href="{{ url_for('main.view_reviews', dataset_type='vegan') }}" class="nav-link text-dark"><i class="fas fa-seedling"></i> Vegan Reviews</a>
+        </nav>
+        <div>
+            <a href="/addReview" class="btn btn-outline-dark"><i class="fas fa-plus-circle"></i> Add Review</a>
+        </div>
+    </div>
+</header>
+
+<!-- Login Popup Form -->
+<div id="loginPopup" class="login-popup">
+    <div class="login-popup-content">
+        <span class="close" onclick="closeLoginPopup()">&times;</span>
+        <form>
+            <h2>Login</h2>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" class="form-control" id="username" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" class="form-control" id="password" placeholder="Enter password">
+            </div>
+            <button type="submit" class="btn btn-dark">Login</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

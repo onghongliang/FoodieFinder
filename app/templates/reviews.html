@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}Reviews for {{ dataset_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center mb-4 font-weight-bold">Reviews for {{ dataset_name }}</h2>
+    
+    <!-- Filter and Search Bar -->
+    <div class="d-flex justify-content-between mb-4">
+        <input type="text" id="search-bar" class="form-control w-50" placeholder="Search...">
+        <select class="form-control w-25" id="sort-options">
+            <option value="rating">Sort by Rating</option>
+        </select>
+    </div>
+    
+    <div class="row" id="reviews-container">
+        {% if reviews_dict %}
+            {% for title, review in reviews_dict.items() %}
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ title }}</h5>
+                        <p class="card-text">
+                            <strong>Average Rating:</strong>
+                            <span class="text-warning">
+                                {% for i in range(1, 6) %}
+                                    {% if i <= review.average_rating %}
+                                        <i class="fas fa-star"></i>
+                                    {% elif i - review.average_rating < 1 %}
+                                        <i class="fas fa-star-half-alt"></i>
+                                    {% else %}
+                                        <i class="far fa-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                            </span>
+                            ({{ review.average_rating }})
+                        </p>
+                        <p class="card-text">Number of Reviews: {{ review.review_count }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">No reviews available</h5>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page - 1 }}">Previous</a>
+            </li>
+            {% endif %}
+
+            {% for p in range(max(1, page - 2), min(total_pages, page + 2) + 1) %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+            </li>
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page + 1 }}">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .card:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    .page-item.active .page-link {
+        background-color: #007bff;
+        border-color: #007bff;
+    }
+</style>
+
+<script>
+    document.getElementById('search-bar').addEventListener('input', function() {
+        const searchTerm = this.value;
+        fetchReviews(searchTerm, 1, '{{ dataset_type }}');
+    });
+
+    document.getElementById('sort-options').addEventListener('change', function() {
+        const searchTerm = document.getElementById('search-bar').value;
+        fetchReviews(searchTerm, 1, '{{ dataset_type }}');
+    });
+
+    function fetchReviews(searchTerm, page, dataset) {
+        fetch(`/search_reviews?term=${encodeURIComponent(searchTerm)}&page=${page}&dataset=${dataset}`)
+            .then(response => response.json())
+            .then(data => {
+                const reviewsContainer = document.querySelector('#reviews-container');
+                reviewsContainer.innerHTML = '';
+
+                if (data.reviews.length === 0) {
+                    reviewsContainer.innerHTML = '<div class="col-12"><div class="card shadow-sm"><div class="card-body text-center"><h5 class="card-title">No reviews available</h5></div></div></div>';
+                } else {
+                    data.reviews.forEach(item => {
+                        const reviewCard = document.createElement('div');
+                        reviewCard.classList.add('col-md-6', 'mb-4');
+                        reviewCard.innerHTML = `
+                            <div class="card shadow-sm h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">${item.title}</h5>
+                                    <p class="card-text">
+                                        <strong>Average Rating:</strong>
+                                        <span class="text-warning">
+                                            ${generateStars(item.average_rating)}
+                                        </span>
+                                        (${item.average_rating})
+                                    </p>
+                                    <p class="card-text">Number of Reviews: ${item.review_count}</p>
+                                </div>
+                            </div>
+                        `;
+                        reviewsContainer.appendChild(reviewCard);
+                    });
+                }
+
+                // Update pagination
+                const paginationContainer = document.querySelector('.pagination');
+                paginationContainer.innerHTML = '';
+
+                if (data.total_pages > 1) {
+                    if (data.page > 1) {
+                        const prevItem = document.createElement('li');
+                        prevItem.classList.add('page-item');
+                        prevItem.innerHTML = `<a class="page-link" href="#" onclick="fetchReviews('${searchTerm}', ${data.page - 1}, '${dataset}')">Previous</a>`;
+                        paginationContainer.appendChild(prevItem);
+                    }
+
+                    for (let p = Math.max(1, data.page - 2); p <= Math.min(data.total_pages, data.page + 2); p++) {
+                        const pageItem = document.createElement('li');
+                        pageItem.classList.add('page-item', p === data.page ? 'active' : '');
+                        pageItem.innerHTML = `<a class="page-link" href="#" onclick="fetchReviews('${searchTerm}', ${p}, '${dataset}')">${p}</a>`;
+                        paginationContainer.appendChild(pageItem);
+                    }
+
+                    if (data.page < data.total_pages) {
+                        const nextItem = document.createElement('li');
+                        nextItem.classList.add('page-item');
+                        nextItem.innerHTML = `<a class="page-link" href="#" onclick="fetchReviews('${searchTerm}', ${data.page + 1}, '${dataset}')">Next</a>`;
+                        paginationContainer.appendChild(nextItem);
+                    }
+                }
+            });
+    }
+
+    function generateStars(rating) {
+        const fullStars = Math.floor(rating);
+        const halfStar = rating % 1 >= 0.5;
+        const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+
+        return (
+            `${'<i class="fas fa-star"></i>'.repeat(fullStars)}` +
+            `${halfStar ? '<i class="fas fa-star-half-alt"></i>' : ''}` +
+            `${'<i class="far fa-star"></i>'.repeat(emptyStars)}`
+        );
+    }
+</script>
+{% endblock %}

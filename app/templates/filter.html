@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - FoodieFinder{% endblock %}
+
+{% block content %}
+
+<div class="container my-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <span class="mr-2">Choose Food Option:</span>
+            <form class="form-inline" method="post" action="/filter" onsubmit="return validateForm()">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="dataset" id="dataset-halal" value="halal">
+                    <label class="form-check-label" for="dataset-halal">Halal</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="dataset" id="dataset-vegan" value="vegan">
+                    <label class="form-check-label" for="dataset-vegan">Vegan</label>
+                </div>
+                <span class="mr-2 ml-4">Filter by rating:</span>
+                <div class="input-group" style="max-width: 200px;">
+                    <input id="rating-input" type="number" class="form-control" name="rating" placeholder="1 - 5" min="1" max="5" step="0.1">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-success" type="submit">Filter</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <h3>Filtered Results for {{ dataset_name }}:</h3>
+    {% if results %}
+    <div class="row">
+        {% for result in results %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                {% if image_url %}
+                <img src="{{ image_url }}" alt="{{ dataset_name }} image" style="width: 100%; max-width: 800px;">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ result['Title'] }}</h5>
+                    <p class="card-text">{{ result['Address'] }}</p>
+                    <p class="card-text text-muted">
+                        {% set rounded_rating = result['Numerical Rating']|int %}
+                        <span style="letter-spacing: -2px;">
+                            {% for i in range(rounded_rating) %}
+                            ★
+                            {% endfor %}
+                        </span>
+                        <span style="margin-left: 5px;">{{ result['Numerical Rating'] }} / 5.0</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p>No results found for the selected rating.</p>
+    {% endif %}
+</div>
+
+<script>
+        function validateForm() {
+    // Check if any radio button is selected
+    var radios = document.getElementsByName('dataset');
+    var isRadioSelected = false;
+
+    for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+            isRadioSelected = true;
+            break;
+        }
+    }
+
+    if (!isRadioSelected) {
+        alert("Please select Halal or Vegan.");
+        return false; // Prevent form submission
+    }
+
+    // Check if rating input is provided
+    var rating = document.getElementById('rating-input').value;
+    if (rating === "") {
+        alert("Please enter a rating.");
+        return false; // Prevent form submission
+    }
+
+    return true; // Allow form submission
+}
+
+</script>
+{% endblock %}
